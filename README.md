@@ -4,7 +4,8 @@ Requirements:
 + python3
 
 Logging:
-Server creates logs in logs.log file
++ Server creates logs in logs.log file
++ Client creates logs in logs.log file
 
 TO-DO:
 + Add possibility to play player vs player (major)

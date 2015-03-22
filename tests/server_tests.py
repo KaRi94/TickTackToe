@@ -123,6 +123,9 @@ class GameTest(TestCase):
         }
         self.assertEqual(0, get_move.call_count)
         # self.assertEqual(expected_response, response)
+        self.assertEqual(expected_response['marker'], response['marker'])
+        self.assertEqual(expected_response['board'], response['board'])
+        self.assertEqual(expected_response['status'], response['status'])
 
         draw_first_player.return_value = self.game.second_player
         expected_response = {
@@ -131,8 +134,10 @@ class GameTest(TestCase):
             'board': self.game.board.board,
             'status': True,
         }
-        # self.assertEqual(1, get_move.call_count)
         # self.assertEqual(expected_response, response)
+        self.assertEqual(expected_response['marker'], response['marker'])
+        self.assertEqual(expected_response['board'], response['board'])
+        self.assertEqual(expected_response['status'], response['status'])
 
     @mock.patch.object(Board, 'is_free')
     def test_turn_returns_false_if_incorrect_area(self, is_free):

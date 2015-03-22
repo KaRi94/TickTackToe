@@ -4,11 +4,14 @@ import logging
 from sys import exit
 
 logging.basicConfig(
-    format='%(asctime)s %(message)s',
+    format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
     datefmt='%m/%d/%Y %I:%M:%S %p',
     filename='logs.log',
     level=logging.DEBUG
 )
+logger_ClientConnection = logging.getLogger('ClientConnection')
+logger_ClientGame = logging.getLogger('ClientGame')
+
 class Connection(object):
     def __init__(self, IP, PORT):
         try:
@@ -16,7 +19,7 @@ class Connection(object):
             self.socket.connect((IP, PORT))
         except Exception as e:
             print('Cannot connect to server. Try again.')
-            logging.exception(e)
+            logger_ClientConnection.exception(e)
             exit()
 
     def __enter__(self):
@@ -29,17 +32,17 @@ class Connection(object):
         # print(data)
         try:
             self.socket.send(bytes(json.dumps(data), 'UTF-8'))
-            logging.info('Client sent %s message' % data.get('message'))
+            logger_ClientConnection.info('Client sent %s message' % data.get('message'))
         except Exception as e:
-            logging.exception(e)
+            logger_ClientConnection.exception(e)
 
     def retrieve_message(self):
         try:
             result = json.loads(self.socket.recv(1024).decode('UTF-8'))
-            logging.info('Client received %s message' % result.get('message'))
+            logger_ClientConnection.info('Client received %s message' % result.get('message'))
             return result
         except Exception as e:
-            logging.exception(e)
+            logger_ClientConnection.exception(e)
             return None
 
 class Interface(object):
@@ -99,7 +102,6 @@ class Client(object):
         while True:
             response_game_id = result.get('game_id')
             if result and response_game_id != game_id:
-                print('dupa')
                 continue
             response = result['response']
 
@@ -120,9 +122,17 @@ class Client(object):
             if status:
                 board = response['board']
                 self.interface.display_board(board)
-                area = int(input('Now your move. Type empty area where you want to place %s (1-9): ' % marker))
+                try:
+                    area = int(input('Now your move. Type the empty area where you want to place %s (1-9): ' % marker))
+                except Exception as e:
+                    logger_ClientGame.exception(e)
+                    area = -1
             else:
-                area = int(input('Wrong choice!, Try again (1-9): '))
+                try:
+                    area = int(input('Wrong choice!, Try again (1-9): '))
+                except Exception as e:
+                    logger_ClientGame.exception(e)
+                    area = -1
             data = {
                 'message': 'turn',
                 'game_id': game_id,

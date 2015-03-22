@@ -5,72 +5,75 @@ import json
 import string
 from copy import deepcopy
 import logging
+
 logging.basicConfig(
-    format='%(asctime)s %(message)s',
+    format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
     datefmt='%m/%d/%Y %I:%M:%S %p',
     filename='logs.log',
     level=logging.DEBUG
 )
+logger_ServerConnection = logging.getLogger('ServerConnection')
+logger_ServerGame = logging.getLogger('ServerGame')
 
 class MyTCPServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
 
 class MyTCPServerHandler(socketserver.BaseRequestHandler):
-    chars = string.ascii_uppercase + string.digits + string.ascii_lowercase
-    game = {}
     def handle(self):
         try:
             data = json.loads(self.request.recv(1024).decode('UTF-8').strip())
             message = data.get('message')
             if message:
-                logging.info('Server received %s message' % message)
+                logger_ServerConnection.info('Server received %s message' % message)
             if message == 'start':
-                game_id = ''.join(random.sample(MyTCPServerHandler.chars, 20))
+                game_id = ''.join(random.sample(Game.chars, 20))
                 data = {
                     'message': 'ok_give_name',
                     'game_id': game_id,
                 }
                 self.send_message(data)
-                MyTCPServerHandler.game[game_id] = Game(game_id)
+                Game.game[game_id] = Game(game_id)
             if message == 'name':
                 game_id = data['game_id']
                 name = data['name']
-                game = MyTCPServerHandler.game[game_id]
-                response = game.register_player(name)
-                data = {
-                    'message': 'ok_start_game',
-                    'game_id': game_id,
-                    'response': response,
-                }
-                self.send_message(data)
+                game = Game.game.get(game_id)
+                if game:
+                    response = game.register_player(name)
+                    data = {
+                        'message': 'ok_start_game',
+                        'game_id': game_id,
+                        'response': response,
+                    }
+                    self.send_message(data)
             if message == 'turn':
-                game_id = data['game_id']
-                area = data['area']
-                marker = data['marker']
-                game = MyTCPServerHandler.game[game_id]
-                response = game.turn(area, marker)
-                if response['status'] == 'gameover':
-                    data = {
-                        'message': 'gameover',
-                        'game_id': game_id,
-                        'response': response,
-                    }
-                else:
-                    data = {
-                        'message': 'your_turn',
-                        'game_id': game_id,
-                        'response': response,
-                    }
-                self.send_message(data)
+                game_id = data.get('game_id')
+                area = data.get('area')
+                marker = data.get('marker')
+                game = Game.game.get(game_id)
+                if game:
+                    response = game.turn(area, marker)
+                    if response['status'] == 'gameover':
+                        data = {
+                            'message': 'gameover',
+                            'game_id': game_id,
+                            'response': response,
+                        }
+                    else:
+                        data = {
+                            'message': 'your_turn',
+                            'game_id': game_id,
+                            'response': response,
+                        }
+                    self.send_message(data)
         except Exception as e:
-            logging.exception(e)
+            logger_ServerConnection.exception(e)
 
     def send_message(self, data):
         try:
             self.request.sendall(bytes(json.dumps(data), 'UTF-8'))
-            logging.info('Server sent %s message' % data.get('message'))
+            logger_ServerConnection.info('Server sent %s message' % data.get('message'))
         except Exception as e:
-            logging.exception(e)
+            logger_ServerConnection.exception(e)
 
 class Board(object):
     winning_combos = (
@@ -98,7 +101,7 @@ class Board(object):
         try:
             self.board[area] = marker
         except Exception as e:
-            logging.exception(e)
+            logger_ServerGame.exception(e)
             raise ValueError('area value should be between 0 and 8')
 
 class Player(object):
@@ -132,7 +135,7 @@ class HumanPlayer(Player):
 
 class ComputerPlayer(Player):
     def get_move(self, board_obj):
-        logging.info('Computer makes move')
+        logger_ServerGame.info('Computer makes move')
         indexes = [index for (index, value) in enumerate(board_obj.board) if value is None]
 
         # Check if the computer can win in the next move
@@ -171,6 +174,9 @@ class ComputerPlayer(Player):
 
 
 class Game(object):
+    chars = string.ascii_uppercase + string.digits + string.ascii_lowercase
+    game = {}
+
     def __init__(self, game_id):
         self.game_id = game_id
         self.board = Board()
