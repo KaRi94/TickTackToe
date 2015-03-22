@@ -1,10 +1,23 @@
 import socket
 import json
+import logging
+from sys import exit
 
+logging.basicConfig(
+    format='%(asctime)s %(message)s',
+    datefmt='%m/%d/%Y %I:%M:%S %p',
+    filename='logs.log',
+    level=logging.DEBUG
+)
 class Connection(object):
     def __init__(self, IP, PORT):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.connect((IP, PORT))
+        try:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.connect((IP, PORT))
+        except Exception as e:
+            print('Cannot connect to server. Try again.')
+            logging.exception(e)
+            exit()
 
     def __enter__(self):
         return self
@@ -14,12 +27,20 @@ class Connection(object):
 
     def send_message(self, data):
         # print(data)
-        self.socket.send(bytes(json.dumps(data), 'UTF-8'))
+        try:
+            self.socket.send(bytes(json.dumps(data), 'UTF-8'))
+            logging.info('Client sent %s message' % data.get('message'))
+        except Exception as e:
+            logging.exception(e)
 
     def retrieve_message(self):
-        result = json.loads(self.socket.recv(1024).decode('UTF-8'))
-        # print(result)
-        return result
+        try:
+            result = json.loads(self.socket.recv(1024).decode('UTF-8'))
+            logging.info('Client received %s message' % result.get('message'))
+            return result
+        except Exception as e:
+            logging.exception(e)
+            return None
 
 class Interface(object):
     board_form = '''
@@ -30,7 +51,7 @@ class Interface(object):
         | %s | %s | %s |
         '''
 
-    def __init__(self):
+    def say_hello(self):
         print('Welcome to Tic Tac Toe game.')
 
     def display_board(self, board):
@@ -38,11 +59,14 @@ class Interface(object):
         print(Interface.board_form % tuple(board))
 
 class Client(object):
-    def __init__(self):
+    def __init__(self, server, port):
         self.interface = Interface()
+        self.interface.say_hello()
+        self.server = server
+        self.port = port
 
     def run(self):
-        with Connection('127.0.0.1', 13373) as connection:
+        with Connection(self.server, self.port) as connection:
             print('Calling server')
             data = {
                 'message': 'start',
@@ -50,7 +74,7 @@ class Client(object):
             connection.send_message(data)
             result = connection.retrieve_message()
 
-        with Connection('127.0.0.1', 13373) as connection:
+        with Connection(self.server, self.port) as connection:
             if result['message'] == 'ok_give_name':
                 game_id = result['game_id']
                 name = input('Type your name: ')
@@ -72,7 +96,6 @@ class Client(object):
             else:
                 print('Server problem occurred. Try again.')
 
-        # with Connection('127.0.0.1', 13373) as connection:
         while True:
             response_game_id = result.get('game_id')
             if result and response_game_id != game_id:
@@ -106,16 +129,6 @@ class Client(object):
                 'area': area,
                 'marker': marker,
             }
-            with Connection('127.0.0.1', 13373) as connection:
+            with Connection(self.server, self.port) as connection:
                 connection.send_message(data)
                 result = connection.retrieve_message()
-
-
-
-            # result = connection.retrieve_message()
-            # result = connection.retrieve_message()
-            # if result['message'] == 'ok':
-            #     print(result)
-
-c = Client()
-c.run()
